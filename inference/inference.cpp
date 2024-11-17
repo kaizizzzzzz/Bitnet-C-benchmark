@@ -11,6 +11,7 @@
 #include <chrono>
 #include "../src_c/bitnet.h"
 #include "../src_c/embedding.h"
+#include "../src_c/rotary_embedding.h"
 #include "../model_config.h"
 #include "load_model.h"
 
@@ -242,6 +243,13 @@ int main(int argc, char* argv[]) {
     std::vector<size_t> encoded_id = get_encoded_id("encoded_prompt.bin");
 
     std::vector<size_t> total_ids;
+
+    //pre-calcute the cos/sin values for rotary embeddings here
+    for (size_t l = 0; l < NUM_LAYERS; ++l) {
+        bitnet_model_data.layers[l].float_params_2D["rotary_emb.cos"] = std::vector<std::vector<float>>(MAX_SEQ_LEN, std::vector<float>(HEAD_NUM));
+        bitnet_model_data.layers[l].float_params_2D["rotary_emb.sin"] = std::vector<std::vector<float>>(MAX_SEQ_LEN, std::vector<float>(HEAD_NUM));
+        rotary_embedding(bitnet_model_data.layers[l].float_params_1D["rotary_emb.inv_freq"], bitnet_model_data.layers[l].float_params_2D["rotary_emb.cos"], bitnet_model_data.layers[l].float_params_2D["rotary_emb.sin"], MAX_SEQ_LEN, HEAD_NUM);
+    }
 
     if (prefill_only){
        total_ids = casual_inference(bitnet_model_data, gen_tokens, encoded_id, temp, topk);

@@ -37,7 +37,8 @@ std::vector<std::vector<float>> bitnet_decoder_layer(
     const QuantizedData &gate_weights,
     const QuantizedData &up_weights,
     const QuantizedData &down_weights,
-    const std::vector<float> &inv_freq,  // New: inv_freq for rotary embeddings
+    const Tensor2D &cos,
+    const Tensor2D &sin,
     const std::vector<float> &ln_weight_in_attn, // New: weights for RMSNorm, attn
     const std::vector<float> &ln_weight_attn, // New: weights for RMSNorm, attn
     const std::vector<float> &ln_weight_in_mlp, // New: weights for RMSNorm, mlp
@@ -51,7 +52,7 @@ std::vector<std::vector<float>> bitnet_decoder_layer(
     std::vector<std::vector<float>> residual = hidden_states;
 
     //attention layer
-    hidden_states = bitnet_attention(hidden_states, q_weights, k_weights, v_weights, o_weights, inv_freq, ln_weight_in_attn, ln_weight_attn, hidden_size, num_heads, head_dim, seq_len, k_cache, v_cache, p_id, mode); 
+    hidden_states = bitnet_attention(hidden_states, q_weights, k_weights, v_weights, o_weights, cos, sin, ln_weight_in_attn, ln_weight_attn, hidden_size, num_heads, head_dim, seq_len, k_cache, v_cache, p_id, mode); 
 
     hidden_states = add_2d_vectors(residual, hidden_states);
     residual = hidden_states;
@@ -82,7 +83,7 @@ std::vector<std::vector<float>> bitnet_decoder(
         std::unordered_map<std::string, QuantizedData> quantized_params = bitnet_model_data.layers[l].quantized_params;
         std::unordered_map<std::string, std::vector<float>> float_params_1D = bitnet_model_data.layers[l].float_params_1D;
         std::unordered_map<std::string, std::vector<std::vector<float>>> float_params_2D = bitnet_model_data.layers[l].float_params_2D;
-        hidden_states = bitnet_decoder_layer(hidden_states, quantized_params["q_proj"], quantized_params["k_proj"], quantized_params["v_proj"], quantized_params["o_proj"], quantized_params["mlp.gate_proj"], quantized_params["mlp.up_proj"], quantized_params["mlp.down_proj"], float_params_1D["rotary_emb.inv_freq"], float_params_1D["input_layernorm"], float_params_1D["inner_attn_ln"], float_params_1D["post_attention_layernorm"], float_params_1D["mlp.ffn_layernorm"], hidden_size, intermediate_size, num_heads, head_dim, seq_len, k_cache, v_cache, 0, "prefill");
+        hidden_states = bitnet_decoder_layer(hidden_states, quantized_params["q_proj"], quantized_params["k_proj"], quantized_params["v_proj"], quantized_params["o_proj"], quantized_params["mlp.gate_proj"], quantized_params["mlp.up_proj"], quantized_params["mlp.down_proj"], float_params_2D["rotary_emb.cos"], float_params_2D["rotary_emb.sin"], float_params_1D["input_layernorm"], float_params_1D["inner_attn_ln"], float_params_1D["post_attention_layernorm"], float_params_1D["mlp.ffn_layernorm"], hidden_size, intermediate_size, num_heads, head_dim, seq_len, k_cache, v_cache, 0, "prefill");
     }
 
     // Apply final_layernorm
@@ -116,7 +117,7 @@ std::vector<std::vector<float>> bitnet_prefill_decoding(
         std::unordered_map<std::string, QuantizedData> quantized_params = bitnet_model_data.layers[l].quantized_params;
         std::unordered_map<std::string, std::vector<float>> float_params_1D = bitnet_model_data.layers[l].float_params_1D;
         std::unordered_map<std::string, std::vector<std::vector<float>>> float_params_2D = bitnet_model_data.layers[l].float_params_2D;
-        hidden_states = bitnet_decoder_layer(hidden_states, quantized_params["q_proj"], quantized_params["k_proj"], quantized_params["v_proj"], quantized_params["o_proj"], quantized_params["mlp.gate_proj"], quantized_params["mlp.up_proj"], quantized_params["mlp.down_proj"], float_params_1D["rotary_emb.inv_freq"], float_params_1D["input_layernorm"], float_params_1D["inner_attn_ln"], float_params_1D["post_attention_layernorm"], float_params_1D["mlp.ffn_layernorm"], hidden_size, intermediate_size, num_heads, head_dim, seq_len, k_cache[l], v_cache[l], p_id, mode);
+        hidden_states = bitnet_decoder_layer(hidden_states, quantized_params["q_proj"], quantized_params["k_proj"], quantized_params["v_proj"], quantized_params["o_proj"], quantized_params["mlp.gate_proj"], quantized_params["mlp.up_proj"], quantized_params["mlp.down_proj"], float_params_2D["rotary_emb.cos"], float_params_2D["rotary_emb.sin"], float_params_1D["input_layernorm"], float_params_1D["inner_attn_ln"], float_params_1D["post_attention_layernorm"], float_params_1D["mlp.ffn_layernorm"], hidden_size, intermediate_size, num_heads, head_dim, seq_len, k_cache[l], v_cache[l], p_id, mode);
     }
 
     // Apply final_layernorm
